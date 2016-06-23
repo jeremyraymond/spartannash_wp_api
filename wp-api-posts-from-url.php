@@ -20,7 +20,7 @@ function get_posts_from_url( $request ) {
 }
 
 add_action( 'rest_api_init', function () {
-    register_rest_route( 'posts-from-url/v2', '/test', array(
+    register_rest_route( 'posts-from-url/v2', '/post', array(
         'methods' => 'GET',
         'callback' => 'get_posts_from_url',
     ) );
