@@ -16,6 +16,8 @@ function get_posts_from_url( $request ) {
     $params = $request->get_query_params();
     $postid = url_to_postid( $params['url'] );
     $post = get_post($postid);
+    $post_meta = get_post_custom($postid);
+    $post = (object) array_merge((array) $post, (array) $post_meta);
     return $post;
 }
 
