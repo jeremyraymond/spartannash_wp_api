@@ -15,10 +15,17 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 function get_posts_from_url( $request ) {
     $params = $request->get_query_params();
     $postid = url_to_postid( $params['url'] );
-    $post = get_post($postid);
-    $post_meta = get_post_custom($postid);
-    $post = (object) array_merge((array) $post, (array) $post_meta);
-    return $post;
+    $post = (array) get_post($postid);
+    $post_meta_raw = (array) get_post_meta($postid);
+    $post_meta = [];
+    foreach($post_meta_raw as $key => $value) {
+        $pos = strpos($key, '_');
+        if ($pos == 0) {
+            $key = substr_replace($key, "", $pos, 1);
+        }
+        $post['post_meta'][$key] = maybe_unserialize($value[0]);
+    }
+    return (object) $post;
 }
 
 add_action( 'rest_api_init', function () {
