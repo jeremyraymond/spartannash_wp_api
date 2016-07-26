@@ -1,6 +1,6 @@
 <?php
 
-class SpartanNash_Posts extends WP_REST_Controller {
+class SpartanNash_WP_API extends WP_REST_Controller {
 
     /**
      * Register the routes for the objects of the controller.
@@ -8,26 +8,38 @@ class SpartanNash_Posts extends WP_REST_Controller {
     public function register_routes() {
         $version = '2';
         $namespace = 'spartannash/v' . $version;
-        $base = 'posts';
 
-        register_rest_route( $namespace, '/' . $base, array(
+        /*
+         *  Post routes
+         */
+        register_rest_route( $namespace, '/posts', array(
             array(
                 'methods'         => WP_REST_Server::READABLE,
                 'callback'        => array( $this, 'get_posts' ),
             ),
         ) );
         // All non-home url paths
-        register_rest_route( $namespace, '/' . $base . '/path' . '/(?P<path>.*)', array(
+        register_rest_route( $namespace, '/posts' . '/path' . '/(?P<path>.*)', array(
             array(
                 'methods'         => WP_REST_Server::READABLE,
                 'callback'        => array( $this, 'get_post_from_path' ),
             ),
         ) );
         // Home url path
-        register_rest_route( $namespace, '/' . $base . '/path/', array(
+        register_rest_route( $namespace, '/posts' . '/path/', array(
             array(
                 'methods'         => WP_REST_Server::READABLE,
                 'callback'        => array( $this, 'get_post_from_path' ),
+            ),
+        ) );
+
+        /*
+         *  Posts get functions
+         */
+        register_rest_route( $namespace, '/options' . '/(?P<options>.*)', array(
+            array(
+                'methods'         => WP_REST_Server::READABLE,
+                'callback'        => array( $this, 'get_options' ),
             ),
         ) );
 
@@ -68,11 +80,17 @@ class SpartanNash_Posts extends WP_REST_Controller {
             }
             return new WP_REST_Response($posts, 200);
         }
+        // No matching posts, return a detailed error
         else {
             $params_string = '[ ';
             $i = 1;
             foreach($params as $key => $value) {
-                $params_string .= $key . ' => ' . $value;
+                if (is_array($value)) {
+                    $params_string .= $key . ' => ' . "[ " . implode(',', $value) . " ]";
+                }
+                else {
+                    $params_string .= $key . ' => ' . $value;
+                }
                 if ($i < count($params)) {
                     $params_string .= ', ';
                 }
@@ -115,6 +133,40 @@ class SpartanNash_Posts extends WP_REST_Controller {
             return [
                 "code" => "rest_no_posts",
                 "message" => "No post found matching url: " . $url,
+                "data" => [
+                    "status" => 404
+                ]
+            ];
+        }
+    }
+
+    /**
+     * Get option data
+     *
+     * @param WP_REST_Request $request Full data about the request.
+     * @return WP_Error|WP_REST_Response
+     */
+    public function get_options( $request )
+    {
+        // get all parameters fed in the request and run get_option() on them all
+        $options_array = explode(',', $request['options']);
+        $options = [];
+        foreach($options_array as $option) {
+            $option_value = get_option($option);
+            if($option_value) {
+                $options[$option] = $option_value;
+            }
+            else {
+                $options[$option] = false;
+            }
+        }
+        if($options) {
+            return new WP_REST_Response($options, 200);
+        }
+        else {
+            return [
+                "code" => "rest_no_options",
+                "message" => "No options found matching: " . implode(',', $options_array),
                 "data" => [
                     "status" => 404
                 ]
