@@ -52,3 +52,10 @@ because you don't know the ID when a user enters a url, and if you want to dynam
 that's not possible using vanilla WP API. If left blank, it will retrieve the designated homepage. If the page is a
 child of another page, use the full path of 'parent_page/child_page'. This will retrieve pages, posts, and all custom
 posts that have a url.
+
+### /wp-json/spartannash/v2/options/<$options>
+This endpoint retrieves the values of wordpress options based on the option name using the get_option($option) method
+for every comma separated value. If no options matching the submitted options exist, it returns an error. If some
+submitted options exist but some don't, it will return the value for the ones that do and return false for the ones
+that don't.
+**Example:** http://example.com/wp-json/spartannash/v2/options/header_logo,footer_address,footer_copywrite
