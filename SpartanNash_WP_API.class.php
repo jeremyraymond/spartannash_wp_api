@@ -32,6 +32,20 @@ class SpartanNash_WP_API extends WP_REST_Controller {
                 'callback'        => array( $this, 'get_post_from_path' ),
             ),
         ) );
+        // Get post based on ID
+        register_rest_route( $namespace, '/posts' . '/id' . '/(?P<id>\d+)', array(
+            array(
+                'methods'         => WP_REST_Server::READABLE,
+                'callback'        => array( $this, 'get_post_from_id' ),
+            ),
+        ) );
+        // Get the uri from the ID
+        register_rest_route( $namespace, '/path' . '/id' . '/(?P<id>\d+)', array(
+            array(
+                'methods'         => WP_REST_Server::READABLE,
+                'callback'        => array( $this, 'get_path_from_id' ),
+            ),
+        ) );
 
         /*
          *  Posts get functions
@@ -73,9 +87,12 @@ class SpartanNash_WP_API extends WP_REST_Controller {
                     if ($pos == 0) {
                         $key = substr_replace($key, "", $pos, 1);
                     }
+                    // unserialize if it needs it
+                    $value[0] = maybe_unserialize($value[0]);
                     $post_meta[$key] = $value[0];
                 }
                 $posts[$i] = (array)$posts_array[$i];
+                $posts[$i]['path'] = str_replace(home_url(), '', get_permalink($postid));
                 $posts[$i]['post_meta'] = $post_meta;
             }
             return new WP_REST_Response($posts, 200);
@@ -141,6 +158,63 @@ class SpartanNash_WP_API extends WP_REST_Controller {
     }
 
     /**
+     * Get the path uri based on the post id
+     *
+     * @param WP_REST_Request $request Full data about the request.
+     * @return WP_Error|WP_REST_Response
+     */
+    public function get_path_from_id( $request )
+    {
+        $path = str_replace(home_url(), '', get_permalink($request['id']));
+//        $path = get_page_uri($request['id']);
+
+        if ($path) {
+            return new WP_REST_Response($path, 200);
+        } else {
+            return [
+                "code" => "rest_no_posts",
+                "message" => "No post found matching id: " . $request['id'],
+                "data" => [
+                    "status" => 404
+                ]
+            ];
+        }
+    }
+
+    /**
+     * Get one post based on path
+     *
+     * @param WP_REST_Request $request Full data about the request.
+     * @return WP_Error|WP_REST_Response
+     */
+    public function get_post_from_id( $request )
+    {
+        $postid = $request['id'];
+        $post = (array)get_post($postid);
+        if ($post) {
+
+            $post_meta_raw = (array)get_post_meta($postid);
+
+            foreach ($post_meta_raw as $key => $value) {
+                $pos = strpos($key, '_');
+                if ($pos == 0) {
+                    $key = substr_replace($key, "", $pos, 1);
+                }
+                $post['post_meta'][$key] = maybe_unserialize($value[0]);
+            }
+            return new WP_REST_Response($post, 200);
+        } else {
+            return [
+                "code" => "rest_no_posts",
+                "message" => "No post found matching id: " . $postid,
+                "data" => [
+                    "status" => 404
+                ]
+            ];
+        }
+    }
+
+    /**
      * Get option data
      *
      * @param WP_REST_Request $request Full data about the request.
@@ -154,6 +228,9 @@ class SpartanNash_WP_API extends WP_REST_Controller {
         foreach($options_array as $option) {
             $option_value = get_option($option);
             if($option_value) {
+                if(is_array($option_value)) {
+                    $option_value = implode(',', $option_value);
+                }
                 $options[$option] = $option_value;
             }
             else {
