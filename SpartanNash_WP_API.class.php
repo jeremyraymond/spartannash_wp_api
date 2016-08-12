@@ -48,7 +48,7 @@ class SpartanNash_WP_API extends WP_REST_Controller {
         ) );
 
         /*
-         *  Posts get functions
+         *  Get options
          */
         register_rest_route( $namespace, '/options' . '/(?P<options>.*)', array(
             array(
@@ -57,6 +57,21 @@ class SpartanNash_WP_API extends WP_REST_Controller {
             ),
         ) );
 
+        /*
+         *  Get Menus
+         */
+        register_rest_route( $namespace, '/menus', array(
+            array(
+                'methods'         => WP_REST_Server::READABLE,
+                'callback'        => array( $this, 'get_all_menus' ),
+            ),
+        ) );
+        register_rest_route( $namespace, '/menus' . '/(?P<menu>.*)', array(
+            array(
+                'methods'         => WP_REST_Server::READABLE,
+                'callback'        => array( $this, 'get_menu' ),
+            ),
+        ) );
     }
 
     /**
@@ -69,8 +84,15 @@ class SpartanNash_WP_API extends WP_REST_Controller {
         // Get the query parameters and use them as query arguments
         $params = $request->get_query_params();
         // Explode out the comma separated post types to allow multiple post types in query
-        if ($params['post_type'])
-            $params['post_type'] = explode(',',$params['post_type']);
+        if ($params['post_type']) {
+            $params['post_type'] = explode(',', $params['post_type']);
+        }
+        // Check if the user specified a key to organize the array by, then unset the param before wp_query
+        $primary_key = '';
+        if (isset($params['key'])) {
+            $primary_key = $params['key'];
+            unset($params['key']);
+        }
         $posts_query = new WP_Query($params);
         if ($posts_query->posts) {
             // Create array of just the posts from the query
@@ -91,9 +113,18 @@ class SpartanNash_WP_API extends WP_REST_Controller {
                     $value[0] = maybe_unserialize($value[0]);
                     $post_meta[$key] = $value[0];
                 }
-                $posts[$i] = (array)$posts_array[$i];
-                $posts[$i]['path'] = str_replace(home_url(), '', get_permalink($postid));
-                $posts[$i]['post_meta'] = $post_meta;
+                $posts_array[$i] = (array)$posts_array[$i];
+                $posts_array[$i]['path'] = trim(str_replace(home_url(), '', get_permalink($postid)), "/");
+                $posts_array[$i]['post_meta'] = $post_meta;
+
+                // if primary_key is specified, organize the returned associated array with that as the key
+                if ($primary_key !== '') {
+                    $posts[$posts_array[$i][$primary_key]] = $posts_array[$i];
+                }
+                else {
+                    $posts[$i] = $posts_array[$i];
+
+                }
             }
             return new WP_REST_Response($posts, 200);
         }
@@ -166,7 +197,6 @@ class SpartanNash_WP_API extends WP_REST_Controller {
     public function get_path_from_id( $request )
     {
         $path = str_replace(home_url(), '', get_permalink($request['id']));
-//        $path = get_page_uri($request['id']);
 
         if ($path) {
             return new WP_REST_Response($path, 200);
@@ -244,6 +274,73 @@ class SpartanNash_WP_API extends WP_REST_Controller {
             return [
                 "code" => "rest_no_options",
                 "message" => "No options found matching: " . implode(',', $options_array),
+                "data" => [
+                    "status" => 404
+                ]
+            ];
+        }
+    }
+
+    /**
+     * Get all menu items
+     *
+     * @param WP_REST_Request $request Full data about the request.
+     * @return WP_Error|WP_REST_Response
+     */
+    public function get_all_menus( $request )
+    {
+        $raw_menus = wp_get_nav_menus();
+
+        $menus = [];
+        foreach($raw_menus as $menu) {
+            $menu_items = wp_get_nav_menu_items($menu->term_id);
+            $menus[$menu->slug] = (array) $menu;
+
+            for($i = 0; $i < count($menu_items); $i++) {
+                $menus[$menu->slug]['menu_items'][$i] = (array) $menu_items[$i];
+                $menus[$menu->slug]['menu_items'][$i]['path'] = trim(str_replace(home_url(), '', $menu_items[$i]->url), "/");
+            }
+        }
+
+        if($menus) {
+            return new WP_REST_Response($menus, 200);
+        }
+        else {
+            return [
+                "code" => "rest_no_options",
+                "message" => "No options found matching: " . implode(',', $menus),
+                "data" => [
+                    "status" => 404
+                ]
+            ];
+        }
+    }
+
+    /**
+     * Get one menu from id, name, or slug
+     *
+     * @param WP_REST_Request $request Full data about the request.
+     * @return WP_Error|WP_REST_Response
+     */
+    public function get_menu( $request )
+    {
+        $menu = $request['menu'];
+
+        $menu_items = wp_get_nav_menu_items($menu);
+
+        $item = [];
+        for($i = 0; $i < count($menu_items); $i++) {
+            $item[$i] = (array)$menu_items[$i];
+            $item[$i]['path'] = trim(str_replace(home_url(), '', $menu_items[$i]->url), "/");
+        }
+
+        if($item) {
+            return new WP_REST_Response($item, 200);
+        }
+        else {
+            return [
+                "code" => "rest_no_options",
+                "message" => "No options found matching: " . implode(',', $item),
                 "data" => [
                     "status" => 404
                 ]
