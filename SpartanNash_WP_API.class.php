@@ -2,6 +2,7 @@
 
 class SpartanNash_WP_API extends WP_REST_Controller {
 
+    private $items = [];
     /**
      * Register the routes for the objects of the controller.
      */
@@ -282,7 +283,7 @@ class SpartanNash_WP_API extends WP_REST_Controller {
     }
 
     /**
-     * Get all menu items
+     * Get all menu items from all menus
      *
      * @param WP_REST_Request $request Full data about the request.
      * @return WP_Error|WP_REST_Response
@@ -293,13 +294,8 @@ class SpartanNash_WP_API extends WP_REST_Controller {
 
         $menus = [];
         foreach($raw_menus as $menu) {
-            $menu_items = wp_get_nav_menu_items($menu->term_id);
-            $menus[$menu->slug] = (array) $menu;
-
-            for($i = 0; $i < count($menu_items); $i++) {
-                $menus[$menu->slug]['menu_items'][$i] = (array) $menu_items[$i];
-                $menus[$menu->slug]['menu_items'][$i]['path'] = trim(str_replace(home_url(), '', $menu_items[$i]->url), "/");
-            }
+            $request['menu'] = $menu->term_id;
+            $menus[$menu->slug] = $this->get_menu($request, false);
         }
 
         if($menus) {
@@ -320,31 +316,70 @@ class SpartanNash_WP_API extends WP_REST_Controller {
      * Get one menu from id, name, or slug
      *
      * @param WP_REST_Request $request Full data about the request.
-     * @return WP_Error|WP_REST_Response
+     * @param Bool $external Bool for determining where the function call is coming from
+     * @return WP_Error|WP_REST_Response|array
      */
-    public function get_menu( $request )
+    public function get_menu( $request, $external = true )
     {
         $menu = $request['menu'];
 
         $menu_items = wp_get_nav_menu_items($menu);
 
-        $item = [];
+        // Create new associative array of menu items that uses ID as its key, and the item itself as the value
         for($i = 0; $i < count($menu_items); $i++) {
-            $item[$i] = (array)$menu_items[$i];
-            $item[$i]['path'] = trim(str_replace(home_url(), '', $menu_items[$i]->url), "/");
+            $id = $menu_items[$i]->ID;
+            $this->items[$id] = (array)$menu_items[$i];
+            $this->items[$id]['path'] = trim(str_replace(home_url(), '', $menu_items[$i]->url), "/");
         }
 
-        if($item) {
-            return new WP_REST_Response($item, 200);
+        $items = $this->items;
+
+        foreach ($this->items as $item) {
+            if (!empty($item['menu_item_parent'])) {
+                $items = $this->nestChildItems($items, $item);
+            }
         }
+        // if it's an external request, return a WP_REST_Response
+        if($external) {
+            if ($items) {
+                return new WP_REST_Response($items, 200);
+            } else {
+                return [
+                    "code" => "rest_no_options",
+                    "message" => "No options found matching: " . $menu,
+                    "data" => [
+                        "status" => 404
+                    ]
+                ];
+            }
+        }
+        // If it's an internal function call, just return the array
         else {
-            return [
-                "code" => "rest_no_options",
-                "message" => "No options found matching: " . implode(',', $item),
-                "data" => [
-                    "status" => 404
-                ]
-            ];
+            return $items;
         }
     }
+
+    private function nestChildItems($item_list, $item)
+    {
+        // Loop through $items to find
+        foreach($item_list as $key => &$current_value)
+        {
+            // if the currently iterated item is the parent of the menu item in question
+            if($current_value['ID'] == $item['menu_item_parent']) {
+                // copy the menu item into a list of its children
+                $current_value['children'][$item['ID']] = $item;
+                unset($item_list[$item['ID']]);
+            }
+            else {
+                // if the Item has 'children' then call the function again to get deeper
+                if(isset($current_value['children'])) {
+                    $result = $this->nestChildItems($current_value['children'], $item);
+                    $current_value['children'] = $result;
+                    unset($item_list[$item['ID']]);
+                }
+            }
+        }
+        return $item_list;
+    }
+
 }
