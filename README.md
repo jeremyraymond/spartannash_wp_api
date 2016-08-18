@@ -73,5 +73,12 @@ returns it as an array. It also adds 'path' as a returned value so you can do re
 This endpoint retrieves all of the menu items from a single menu based on either the menu id, slug, or name and returns
 them as an array. It also adds 'path' as a returned value so you can do relative urls in your menu.
 
+### /wp-json/spartannash/v2/shortcodes/<$shortcodes>
+This endpoint takes one or multiple shortcodes and returns an associative array of the related html content with the
+shortcode as the key and the html as the value. If submitting multiple shortcodes, comma separate them. You can with
+or without the brackets. If your shortcode has commas inside the brackets, this could cause issues.
+**Example:** http://example.com/wp-json/spartannash/v2/shortcodes/[vfb id=1],[vfb id=2]
+
+
 
 

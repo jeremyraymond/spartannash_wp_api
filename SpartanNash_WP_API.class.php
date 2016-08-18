@@ -73,6 +73,16 @@ class SpartanNash_WP_API extends WP_REST_Controller {
                 'callback'        => array( $this, 'get_menu' ),
             ),
         ) );
+
+        /*
+         *  Convert Shortcode and return results
+         */
+        register_rest_route( $namespace, '/shortcodes' . '/(?P<shortcodes>.*)', array(
+            array(
+                'methods'         => WP_REST_Server::READABLE,
+                'callback'        => array( $this, 'get_shortcodes_html' ),
+            ),
+        ) );
     }
 
     /**
@@ -303,7 +313,7 @@ class SpartanNash_WP_API extends WP_REST_Controller {
         }
         else {
             return [
-                "code" => "rest_no_options",
+                "code" => "rest_no_menus",
                 "message" => "No options found matching: " . implode(',', $menus),
                 "data" => [
                     "status" => 404
@@ -345,7 +355,7 @@ class SpartanNash_WP_API extends WP_REST_Controller {
                 return new WP_REST_Response($items, 200);
             } else {
                 return [
-                    "code" => "rest_no_options",
+                    "code" => "rest_no_menu",
                     "message" => "No options found matching: " . $menu,
                     "data" => [
                         "status" => 404
@@ -380,6 +390,48 @@ class SpartanNash_WP_API extends WP_REST_Controller {
             }
         }
         return $item_list;
+    }
+
+    /**
+     * Get all menu items from all menus
+     *
+     * @param WP_REST_Request $request Full data about the request.
+     * @return WP_Error|WP_REST_Response
+     */
+    public function get_shortcodes_html( $request )
+    {
+        $shortcode_array = explode(',', $request['shortcodes']);
+        $html_array = [];
+        foreach($shortcode_array as $shortcode) {
+            // if someone enters in the shortcode with brackets, trim them and re-add the brackets
+            $shortcode_string = '[' . ltrim($shortcode, '[');
+            $shortcode_string = urldecode(rtrim($shortcode_string, ']') . ']');
+            // decode the url to convert stuff like %20 into actual spaces, then retrieve the shortcode html string
+            $html_array[$shortcode_string] = do_shortcode($shortcode_string);
+            // if the html is the same as the shortcode, the shortcode doesn't exist, return an error
+            if($html_array[$shortcode_string] == $shortcode_string) {
+                return [
+                    "code" => "rest_no_shortcodes",
+                    "message" => "No shortcodes found matching: " . $shortcode_string,
+                    "data" => [
+                        "status" => 404
+                    ]
+                ];
+            }
+        }
+        if(!empty($html_array)) {
+            return new WP_REST_Response($html_array, 200);
+        }
+        else {
+            return [
+                "code" => "rest_no_shortcodes",
+                "message" => "No shortcodes found matching: " . implode(', ', $html_array),
+                "data" => [
+                    "status" => 404
+                ]
+            ];
+        }
+
     }
 
 }
