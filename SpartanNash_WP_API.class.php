@@ -332,7 +332,6 @@ class SpartanNash_WP_API extends WP_REST_Controller {
     public function get_menu( $request, $external = true )
     {
         $menu = $request['menu'];
-
         $menu_items = wp_get_nav_menu_items($menu);
 
         // Create new associative array of menu items that uses ID as its key, and the item itself as the value
@@ -343,12 +342,12 @@ class SpartanNash_WP_API extends WP_REST_Controller {
         }
 
         $items = $this->items;
-
         foreach ($this->items as $item) {
             if (!empty($item['menu_item_parent'])) {
                 $items = $this->nestChildItems($items, $item);
             }
         }
+        $this->items = [];
         // if it's an external request, return a WP_REST_Response
         if($external) {
             if ($items) {
@@ -401,12 +400,13 @@ class SpartanNash_WP_API extends WP_REST_Controller {
     public function get_shortcodes_html( $request )
     {
         $shortcode_array = explode(',', $request['shortcodes']);
+
         $html_array = [];
         foreach($shortcode_array as $shortcode) {
             // if someone enters in the shortcode with brackets, trim them and re-add the brackets
             $shortcode_string = '[' . ltrim($shortcode, '[');
-            $shortcode_string = urldecode(rtrim($shortcode_string, ']') . ']');
             // decode the url to convert stuff like %20 into actual spaces, then retrieve the shortcode html string
+            $shortcode_string = urldecode(rtrim($shortcode_string, ']') . ']');
             $html_array[$shortcode_string] = do_shortcode($shortcode_string);
             // if the html is the same as the shortcode, the shortcode doesn't exist, return an error
             if($html_array[$shortcode_string] == $shortcode_string) {
