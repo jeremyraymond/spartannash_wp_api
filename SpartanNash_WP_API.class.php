@@ -105,6 +105,7 @@ class SpartanNash_WP_API extends WP_REST_Controller {
             unset($params['key']);
         }
         $posts_query = new WP_Query($params);
+
         if ($posts_query->posts) {
             // Create array of just the posts from the query
             $posts_array = (array)$posts_query->posts;
@@ -113,6 +114,7 @@ class SpartanNash_WP_API extends WP_REST_Controller {
             for ($i = 0; $i < count($posts_array); $i++) {
                 $postid = $posts_array[$i]->ID;
                 $post_meta_raw = get_post_custom($postid);
+                $post_seo = $this->get_yoast_seo($postid);
                 $post_meta = [];
                 // Remove the _ at the start of each post meta
                 foreach ($post_meta_raw as $key => $value) {
@@ -122,11 +124,29 @@ class SpartanNash_WP_API extends WP_REST_Controller {
                     }
                     // unserialize if it needs it
                     $value[0] = maybe_unserialize($value[0]);
+                    $value[0] = do_shortcode($value[0]);
                     $post_meta[$key] = $value[0];
                 }
                 $posts_array[$i] = (array)$posts_array[$i];
                 $posts_array[$i]['path'] = trim(str_replace(home_url(), '', get_permalink($postid)), "/");
+
+                // Get custom taxonomies and then attach the terms that belong to the post onto the post
+                $tax_args = [
+                    'public'   => true,
+                    '_builtin' => false
+                ];
+                $custom_tax = get_taxonomies($tax_args);
+                foreach($custom_tax as $tax) {
+                    $posts_array[$i]['taxonomies'][$tax] = get_the_terms($postid, $tax);
+                }
+                // also add the generic 'categories' and the terms associated with the post
+                $categories = get_the_category($postid);
+                if(!empty($categories)) {
+                    $posts_array[$i]['taxonomies']['categories'] = $categories;
+                }
+
                 $posts_array[$i]['post_meta'] = $post_meta;
+                $posts_array[$i]['post_seo'] = $post_seo;
 
                 // if primary_key is specified, organize the returned associated array with that as the key
                 if ($primary_key !== '') {
@@ -186,6 +206,7 @@ class SpartanNash_WP_API extends WP_REST_Controller {
                     $key = substr_replace($key, "", $pos, 1);
                 }
                 $post['post_meta'][$key] = maybe_unserialize($value[0]);
+                $post['post_meta'][$key] = do_shortcode($post['post_meta'][$key]);
             }
             return new WP_REST_Response($post, 200);
         } else {
@@ -431,6 +452,31 @@ class SpartanNash_WP_API extends WP_REST_Controller {
                 ]
             ];
         }
+
+    }
+
+    private function get_yoast_seo($postid)
+    {
+        $yoastMeta = array(
+            'focuskw' => get_post_meta($postid,'_yoast_wpseo_focuskw', true),
+            'title' => get_post_meta($postid, '_yoast_wpseo_title', true),
+            'metadesc' => get_post_meta($postid, '_yoast_wpseo_metadesc', true),
+            'linkdex' => get_post_meta($postid, '_yoast_wpseo_linkdex', true),
+            'metakeywords' => get_post_meta($postid, '_yoast_wpseo_metakeywords', true),
+            'meta-robots-noindex' => get_post_meta($postid, '_yoast_wpseo_meta-robots-noindex', true),
+            'meta-robots-nofollow' => get_post_meta($postid, '_yoast_wpseo_meta-robots-nofollow', true),
+            'meta-robots-adv' => get_post_meta($postid, '_yoast_wpseo_meta-robots-adv', true),
+            'canonical' => get_post_meta($postid, '_yoast_wpseo_canonical', true),
+            'redirect' => get_post_meta($postid, '_yoast_wpseo_redirect', true),
+            'opengraph-title' => get_post_meta($postid, '_yoast_wpseo_opengraph-title', true),
+            'opengraph-description' => get_post_meta($postid, '_yoast_wpseo_opengraph-description', true),
+            'opengraph-image' => get_post_meta($postid, '_yoast_wpseo_opengraph-image', true),
+            'twitter-title' => get_post_meta($postid, '_yoast_wpseo_twitter-title', true),
+            'twitter-description' => get_post_meta($postid, '_yoast_wpseo_twitter-description', true),
+            'twitter-image' => get_post_meta($postid, '_yoast_wpseo_twitter-image', true)
+        );
+
+        return $yoastMeta;
 
     }
 
