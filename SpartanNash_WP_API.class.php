@@ -75,6 +75,16 @@ class SpartanNash_WP_API extends WP_REST_Controller {
         ) );
 
         /*
+         *  Get Category info with terms
+         */
+        register_rest_route( $namespace, '/categories', array(
+            array(
+                'methods'         => WP_REST_Server::READABLE,
+                'callback'        => array( $this, 'get_categories_with_terms' ),
+            ),
+        ) );
+
+        /*
          *  Convert Shortcode and return results
          */
         register_rest_route( $namespace, '/shortcodes' . '/(?P<shortcodes>.*)', array(
@@ -124,6 +134,7 @@ class SpartanNash_WP_API extends WP_REST_Controller {
                     }
                     // unserialize if it needs it
                     $value[0] = maybe_unserialize($value[0]);
+                    // execute any shortcode that might be inside the content.
                     $value[0] = do_shortcode($value[0]);
                     $post_meta[$key] = $value[0];
                 }
@@ -411,6 +422,43 @@ class SpartanNash_WP_API extends WP_REST_Controller {
         }
         return $item_list;
     }
+
+    /**
+     * Get Categories and all custom categories with terms attached
+     *
+     * @param WP_REST_Request $request Full data about the request.
+     * @return WP_Error|WP_REST_Response
+     */
+    public function get_categories_with_terms( $request )
+    {
+        // Get custom taxonomies and then attach the terms that belong to the post onto the post
+        $tax_args = [
+            'public'   => true,
+            '_builtin' => false
+        ];
+        $categories = [];
+        $categories['category'] = get_terms(['taxonomy' => 'category']);
+        $categories['tags'] = get_terms(['taxonomy' => 'post_tag']);
+        $custom_tax = get_taxonomies($tax_args);
+
+        foreach($custom_tax as $tax) {
+            $categories[$tax] = get_terms(['taxonomy' => $tax]);
+        }
+
+        if(!empty($categories)) {
+            return new WP_REST_Response($categories, 200);
+        }
+        else {
+            return [
+                "code" => "rest_no_shortcodes",
+                "message" => "No categories found.",
+                "data" => [
+                    "status" => 404
+                ]
+            ];
+        }
+    }
+
 
     /**
      * Get all menu items from all menus
