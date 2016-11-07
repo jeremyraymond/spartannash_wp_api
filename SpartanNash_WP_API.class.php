@@ -437,12 +437,12 @@ class SpartanNash_WP_API extends WP_REST_Controller {
             '_builtin' => false
         ];
         $categories = [];
-        $categories['category'] = get_terms(['taxonomy' => 'category']);
-        $categories['tags'] = get_terms(['taxonomy' => 'post_tag']);
+        $categories['category'] = get_terms(['taxonomy' => 'category', 'hide_empty' => false]);
+        $categories['tags'] = get_terms(['taxonomy' => 'post_tag', 'hide_empty' => false]);
         $custom_tax = get_taxonomies($tax_args);
 
         foreach($custom_tax as $tax) {
-            $categories[$tax] = get_terms(['taxonomy' => $tax]);
+            $categories[$tax] = get_terms(['taxonomy' => $tax, 'hide_empty' => false]);
         }
 
         if(!empty($categories)) {
